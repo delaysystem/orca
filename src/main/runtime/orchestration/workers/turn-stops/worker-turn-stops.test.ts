@@ -423,7 +423,7 @@ describe('terminal worker turn stops', () => {
     expect(ctx.mail().map((m) => m.subject)).toEqual(['Worker stopped without reporting'])
   })
 
-  it('stays quiet after a rejected worker_done, until the coordinator writes again', () => {
+  it('stays quiet for the turn whose worker_done was rejected, not for later turns', () => {
     const ctx = setup()
     const writeToWorker = () => {
       const mail = ctx.db.insertMessage({
@@ -445,22 +445,29 @@ describe('terminal worker turn stops', () => {
       })
       ctx.db.convertLifecycleMessageToRejection(sent.id, 'worker_identity_changed', 'not the owner')
     }
-    const stop = (stopKey: string) =>
+    const stop = (stopKey: string, turnStartedAt: number) =>
       reportWorkerTurnStop(
         ctx.db,
         { kind: 'local', dispatch: ctx.dispatch },
-        { from: HANDLE, stopKey, reason: 'finished', lastOutput: undefined },
+        { from: HANDLE, stopKey, reason: 'finished', lastOutput: undefined, turnStartedAt },
         ctx.deps
       )
+    // The rejection is stored on the real clock: after 1970, before 2100.
+    const before = 1_000
+    const after = 4_102_444_800_000
     writeToWorker()
     report('worker_done')
-    stop('turn-1')
+    stop('turn-1', before)
     expect(ctx.mail()).toEqual([])
+
+    // A later idle turn that sent nothing is news, though the coordinator has not written since.
+    stop('turn-2', after)
+    expect(ctx.mail().map((m) => m.subject)).toEqual(['Worker stopped without reporting'])
 
     writeToWorker()
     report('heartbeat')
-    stop('turn-2')
-    expect(ctx.mail().map((m) => m.subject)).toEqual(['Worker stopped without reporting'])
+    stop('turn-3', before)
+    expect(ctx.mail()).toHaveLength(2)
   })
 
   it('reports a later stall once new mail reached the worker, though its question is pending', async () => {

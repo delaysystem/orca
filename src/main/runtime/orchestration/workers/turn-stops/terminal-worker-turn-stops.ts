@@ -79,6 +79,7 @@ export class TerminalWorkerTurnStops {
       {
         from: resolved.handle,
         stopKey: `${stop.paneKey}:${stop.row.stateStartedAt}`,
+        turnStartedAt: stop.row.turnStartedAt,
         reason,
         lastOutput
       },

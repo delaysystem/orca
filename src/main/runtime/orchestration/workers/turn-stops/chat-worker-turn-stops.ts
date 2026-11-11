@@ -38,9 +38,12 @@ export function chatWorkerTurnStopReporter(
   deps: WorkerTurnStopReportDeps,
   setTimer: (run: () => void, delayMs: number) => void = (run, delayMs) => {
     setTimeout(run, delayMs).unref?.()
-  }
+  },
+  now: () => number = Date.now
 ) {
   const generations = new Map<string, number>()
+  // A turn begins after its session's previous turn completed; a prompt arrives mid-turn and bounds nothing.
+  const previousCompletionAt = new Map<string, number>()
   return (
     event: AgentSessionTurnCompletionEvent,
     readStatus: (
@@ -60,6 +63,10 @@ export function chatWorkerTurnStopReporter(
       // Any later edge, even one not reported (a failed or cancelled turn), supersedes a pending stop.
       const generation = (generations.get(sessionId) ?? 0) + 1
       generations.set(sessionId, generation)
+      const turnStartedAt = previousCompletionAt.get(sessionId)
+      if (event.type === 'completion') {
+        previousCompletionAt.set(sessionId, now())
+      }
       const stop = chatStop(event)
       const db = stop ? deps.getDb() : null
       if (!stop || !db) {
@@ -101,7 +108,8 @@ export function chatWorkerTurnStopReporter(
                 from,
                 stopKey: stop.stopKey,
                 reason: stop.reason,
-                lastOutput: status?.lastAssistantMessage
+                lastOutput: status?.lastAssistantMessage,
+                turnStartedAt
               },
               deps
             )

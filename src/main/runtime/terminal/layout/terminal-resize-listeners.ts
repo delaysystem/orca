@@ -90,9 +90,12 @@ export abstract class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRunti
   ): void {
     const db = this._orchestrationDb
     const attachment = db?.findActiveRemoteAttachmentForPane(paneKey)
+    // The coordinator's own worker-stop closes the terminal before it settles the attachment.
     if (
       !db ||
       !attachment ||
+      attachment.state === 'stopping' ||
+      attachment.state === 'stop_unknown' ||
       !db.isRemoteAttachmentProcessCurrent({
         dispatchId: attachment.dispatch_id,
         paneKey,
@@ -170,7 +173,7 @@ export abstract class OrcaRuntimeWithSubscribeToTerminalResize extends OrcaRunti
       return true
     }
     const settled = db.failDispatch(dispatch.id, failure.error, failure.options)?.status
-    // A stop asked for earlier (unconfirmed, or by a runtime before a restart) ends as asked, not as news.
+    // A stop asked for earlier (unconfirmed, or by a runtime before a restart) settles the Dispatch as failed, but sends no mail: the coordinator asked for it.
     if (stopping?.state === 'stopping' || stopping?.state === 'stop_unknown') {
       return true
     }

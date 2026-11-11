@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { OrchestrationDb } from '../../db/orchestration-db'
 import { dispatchReportMailbox } from '../reports/dispatch-report-mailbox'
 import { readCoordinatorMailCount } from '../../db/messages/dispatch-read-mail'
-import { rejectedReportSinceLatestMail } from '../../db/messages/rejected-worker-report'
+import { rejectedReportInTurn } from '../../db/messages/rejected-worker-report'
 import type {
   DispatchContextRow,
   RemoteDispatchAttachmentRow
@@ -22,6 +22,8 @@ export type WorkerTurnStop = {
   stopKey?: string
   reason: WorkerTurnStopReason
   lastOutput: string | undefined
+  /** When the stopping turn began, on this host's clock; absent when unknown. */
+  turnStartedAt?: number
   /** Why the worker went away, for an `exited` or `lost` stop. */
   cause?: string
   /** What the worker left behind, such as the workspace of a start that failed. */
@@ -117,7 +119,7 @@ export function reportWorkerTurnStop(
     (deps.isWaitingForMail(`dispatch:${dispatchId}`) ||
       (stop.reason === 'finished' &&
         (db.awaitsCoordinator(dispatchId) ||
-          rejectedReportSinceLatestMail(db, dispatchId) ||
+          rejectedReportInTurn(db, dispatchId, stop.turnStartedAt) ||
           (target.kind === 'local' && db.hasOpenHelperDispatch(dispatchId)))))
   ) {
     return
