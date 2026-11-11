@@ -20536,6 +20536,7 @@
         "deny": "Deny",
         "cancel": "Cancel",
         "reason": "Reason",
+        "reasonSentAsMessage": "Reason, sent as a message",
         "needsAccess": "Needs access to",
         "needsNewerOrca": "This request needs a newer version of Orca.",
         "plan": {
